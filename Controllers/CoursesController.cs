@@ -8,6 +8,8 @@ using System.Web;
 using System.Web.Mvc;
 using University.DAL;
 using University.Models;
+using System.Data.Entity.Infrastructure;
+
 
 namespace University.Controllers
 {
@@ -18,7 +20,8 @@ namespace University.Controllers
         // GET: Courses
         public ActionResult Index()
         {
-            return View(db.Courses.ToList());
+            var courses = db.Courses.Include(c => c.Department);
+            return View(courses.ToList());
         }
 
         // GET: Courses/Details/5
@@ -39,6 +42,7 @@ namespace University.Controllers
         // GET: Courses/Create
         public ActionResult Create()
         {
+            //PopulateDepartmentsDropDownList();
             return View();
         }
 
