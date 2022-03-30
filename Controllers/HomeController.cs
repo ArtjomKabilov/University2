@@ -18,19 +18,37 @@ namespace University.Controllers
         private SchoolContext db = new SchoolContext();
         public ActionResult About()
         {
-            IQueryable<EnrollmentDateGroup> data = from student in db.Students
-                group student by student.EnrollmentDate into dateGroup
-                select new EnrollmentDateGroup()
-                {
-                    EnrollmentDate = dateGroup.Key,
-                    StudentCount = dateGroup.Count()
-                };
-                return View(data.ToList());
+            /*var data = from student in db.Students
+            group student by student.EnrollmentDate into dateGroup
+            select new EnrollmentDateGroup()
+            {
+                EnrollmentDate = dateGroup.Key,
+                StudentCount = dateGroup.Count()
+            };
+                 return View(data.ToList());*/
+            // Commenting out LINQ to show how to do the same thing in SQL.
+            //IQueryable<EnrollmentDateGroup> = from student in db.Students
+            //           group student by student.EnrollmentDate into dateGroup
+            //           select new EnrollmentDateGroup()
+            //           {
+            //               EnrollmentDate = dateGroup.Key,
+            //               StudentCount = dateGroup.Count()
+            //           };
+
+            // SQL version of the above LINQ code.
+            string query = "SELECT EnrollmentDate, COUNT(*) AS StudentCount "
+                + "FROM Person "
+                + "WHERE Discriminator = 'Student' "
+                + "GROUP BY EnrollmentDate";
+            IEnumerable<EnrollmentDateGroup> data = db.Database.SqlQuery<EnrollmentDateGroup>(query);
+
+            return View(data.ToList());
         }
         protected override void Dispose(bool disposing)
         {
             db.Dispose();
             base.Dispose(disposing);
         }
+
     }
 }

@@ -42,26 +42,32 @@ namespace University.Controllers
         // GET: Courses/Create
         public ActionResult Create()
         {
-            //PopulateDepartmentsDropDownList();
+            PopulateDepartmentsDropDownList();
             return View();
         }
 
-        // POST: Courses/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to, for 
-        // more details see https://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult Create([Bind(Include = "CourseID,Title,Credits")] Course course)
+        public ActionResult Create([Bind(Include = "CourseID,Title,Credits,DepartmentID")] Course course)
         {
-            if (ModelState.IsValid)
+            try
             {
-                db.Courses.Add(course);
-                db.SaveChanges();
-                return RedirectToAction("Index");
+                if (ModelState.IsValid)
+                {
+                    db.Courses.Add(course);
+                    db.SaveChanges();
+                    return RedirectToAction("Index");
+                }
             }
-
+            catch (RetryLimitExceededException /* dex */)
+            {
+                //Log the error (uncomment dex variable name and add a line here to write a log.)
+                ModelState.AddModelError("", "Unable to save changes. Try again, and if the problem persists, see your system administrator.");
+            }
+            PopulateDepartmentsDropDownList(course.DepartmentID);
             return View(course);
         }
+
 
         // GET: Courses/Edit/5
         public ActionResult Edit(int? id)
@@ -70,28 +76,62 @@ namespace University.Controllers
             {
                 return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
             }
-            Course course = db.Courses.Find(id);
-            if (course == null)
+            Instructor instructor = db.Instructors
+                .Include(i => i.OfficeAssignment)
+                .Where(i => i.ID == id)
+                .Single();
+            if (instructor == null)
             {
                 return HttpNotFound();
             }
-            return View(course);
+            return View(instructor);
         }
 
         // POST: Courses/Edit/5
         // To protect from overposting attacks, enable the specific properties you want to bind to, for 
         // more details see https://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost]
+        [HttpPost, ActionName("Edit")]
         [ValidateAntiForgeryToken]
-        public ActionResult Edit([Bind(Include = "CourseID,Title,Credits")] Course course)
+        public ActionResult EditPost(int? id)
         {
-            if (ModelState.IsValid)
+            if (id == null)
             {
-                db.Entry(course).State = EntityState.Modified;
-                db.SaveChanges();
-                return RedirectToAction("Index");
+                return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
             }
-            return View(course);
+            var instructorToUpdate = db.Instructors
+               .Include(i => i.OfficeAssignment)
+               .Where(i => i.ID == id)
+               .Single();
+
+            if (TryUpdateModel(instructorToUpdate, "",
+               new string[] { "LastName", "FirstMidName", "HireDate", "OfficeAssignment" }))
+            {
+                try
+                {
+                    if (String.IsNullOrWhiteSpace(instructorToUpdate.OfficeAssignment.Location))
+                    {
+                        instructorToUpdate.OfficeAssignment = null;
+                    }
+
+                    db.SaveChanges();
+
+                    return RedirectToAction("Index");
+                }
+                catch (RetryLimitExceededException /* dex */)
+                {
+                    //Log the error (uncomment dex variable name and add a line here to write a log.
+                    ModelState.AddModelError("", "Unable to save changes. Try again, and if the problem persists, see your system administrator.");
+                }
+            }
+            return View(instructorToUpdate);
+        }
+
+        private void PopulateDepartmentsDropDownList(object selectedDepartment = null)
+        {
+            var departmentsQuery = from d in db.Departments
+                                   orderby d.Name
+                                   select d;
+            ViewBag.DepartmentID = new SelectList(departmentsQuery, "DepartmentID", "Name", selectedDepartment);
         }
 
         // GET: Courses/Delete/5
@@ -127,6 +167,20 @@ namespace University.Controllers
                 db.Dispose();
             }
             base.Dispose(disposing);
+        }
+        public ActionResult UpdateCourseCredits()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public ActionResult UpdateCourseCredits(int? multiplier)
+        {
+            if (multiplier != null)
+            {
+                ViewBag.RowsAffected = db.Database.ExecuteSqlCommand("UPDATE Course SET Credits = Credits * {0}", multiplier);
+            }
+            return View();
         }
     }
 }
